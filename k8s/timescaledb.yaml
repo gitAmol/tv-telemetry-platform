@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: timescaledb-init
+  namespace: telemetry
+data:
+  init.sql: |
+    CREATE EXTENSION IF NOT EXISTS timescaledb;
+    
+    CREATE TABLE IF NOT EXISTS bt_events (
+        time        TIMESTAMPTZ NOT NULL,
+        tv_id       TEXT NOT NULL,
+        device_name TEXT,
+        device_type TEXT,
+        mac_address TEXT,
+        connection_ms INTEGER,
+        rssi        INTEGER
+    );
+    SELECT create_hypertable('bt_events', 'time', if_not_exists => TRUE);
+    CREATE INDEX IF NOT EXISTS idx_bt_events_tv ON bt_events (tv_id, time DESC);
+    
+    CREATE TABLE IF NOT EXISTS bt_window_stats (
+        window_start    TIMESTAMPTZ NOT NULL,
+        window_end      TIMESTAMPTZ NOT NULL,
+        tv_id           TEXT NOT NULL,
+        event_count     INTEGER,
+        avg_connection_ms DOUBLE PRECISION,
+        p99_connection_ms DOUBLE PRECISION,
+        unique_devices  INTEGER,
+        avg_rssi        DOUBLE PRECISION,
+        PRIMARY KEY (tv_id, window_start)
+    );
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: timescaledb
+  namespace: telemetry
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: timescaledb
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: timescaledb
+  namespace: telemetry
+spec:
+  serviceName: timescaledb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: timescaledb
+  template:
+    metadata:
+      labels:
+        app: timescaledb
+    spec:
+      containers:
+        - name: timescaledb
+          image: timescale/timescaledb:latest-pg15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "postgres"
+            - name: POSTGRES_DB
+              value: "telemetry"
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 250m
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init
+          configMap:
+            name: timescaledb-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 10Gi

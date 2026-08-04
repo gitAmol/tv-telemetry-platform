@@ -1,0 +1,73 @@
+{
+  "title": "TV Bluetooth Telemetry",
+  "uid": "tv-bt-telemetry",
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Fleet Avg Connection Time (ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [{
+        "datasource": "TimescaleDB",
+        "rawSql": "SELECT hour AS time, fleet_avg_conn_ms AS \"Avg (ms)\" FROM bt_hourly_fleet WHERE $__timeFilter(hour) ORDER BY hour",
+        "format": "time_series"
+      }],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "color": { "mode": "palette-classic" } }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Fleet P99 Connection Time (ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [{
+        "datasource": "TimescaleDB",
+        "rawSql": "SELECT hour AS time, fleet_p99_conn_ms AS \"P99 (ms)\" FROM bt_hourly_fleet WHERE $__timeFilter(hour) ORDER BY hour",
+        "format": "time_series"
+      }],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "color": { "fixedColor": "orange", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Active TVs per Hour",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [{
+        "datasource": "TimescaleDB",
+        "rawSql": "SELECT hour AS time, active_tvs AS \"Active TVs\" FROM bt_hourly_fleet WHERE $__timeFilter(hour) ORDER BY hour",
+        "format": "time_series"
+      }],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "fixedColor": "green", "mode": "fixed" } }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Connection Events by Device Type",
+      "type": "piechart",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [{
+        "datasource": "TimescaleDB",
+        "rawSql": "SELECT device_type AS metric, COUNT(*) AS value FROM bt_events WHERE $__timeFilter(time) GROUP BY device_type ORDER BY value DESC",
+        "format": "table"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "Slowest TVs (avg connection ms, last hour)",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 8 },
+      "targets": [{
+        "datasource": "TimescaleDB",
+        "rawSql": "SELECT tv_id, ROUND(avg_conn_ms::numeric, 1) AS avg_ms, ROUND(p99_conn_ms::numeric, 1) AS p99_ms, event_count, unique_devices FROM bt_window_stats WHERE window_start >= NOW() - INTERVAL '1 hour' ORDER BY avg_conn_ms DESC LIMIT 20",
+        "format": "table"
+      }]
+    }
+  ]
+}

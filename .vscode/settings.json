@@ -1,0 +1,22 @@
+{
+  "cmake.configureSettings": {
+    "CMAKE_TOOLCHAIN_FILE": "C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+  },
+  "cmake.buildDirectory": "${workspaceFolder}/agent/build",
+  "cmake.sourceDirectory": "${workspaceFolder}/agent",
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "files.associations": {
+    "*.hpp": "cpp",
+    "*.cpp": "cpp",
+    "docker-compose.yml": "dockercompose"
+  },
+  "editor.formatOnSave": true,
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "[cpp]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  },
+  "[java]": {
+    "editor.defaultFormatter": "redhat.java"
+  }
+}

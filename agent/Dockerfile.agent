@@ -1,0 +1,41 @@
+# Stage 1: Build
+FROM ubuntu:22.04 AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake g++ pkg-config \
+    libsqlite3-dev \
+    nlohmann-json3-dev \
+    librdkafka-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY agent/CMakeLists.txt ./
+COPY agent/include/       ./include/
+COPY agent/src/           ./src/
+
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_KAFKA=ON -DBUILD_TESTS=OFF . \
+    && make -j$(nproc)
+
+# Stage 2: Runtime (minimal image)
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsqlite3-0 librdkafka++1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 agent \
+    && mkdir -p /data && chown agent:agent /data
+
+WORKDIR /app
+COPY --from=builder /build/tv-bt-agent ./
+
+USER agent
+VOLUME ["/data"]
+
+ENV TV_ID=""
+ENV BROKERS="localhost:9092"
+ENV DB_PATH="/data/buffer.db"
+
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD test -f "${DB_PATH}" || exit 1
+
+ENTRYPOINT ["/bin/sh", "-c", "/app/tv-bt-agent \"$TV_ID\" \"$BROKERS\" \"$DB_PATH\""]

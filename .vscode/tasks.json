@@ -1,0 +1,102 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake: Configure Agent",
+      "type": "shell",
+      "command": "cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_KAFKA=OFF -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "options": { "cwd": "${workspaceFolder}/agent" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "CMake: Build Agent",
+      "type": "shell",
+      "command": "cmake --build build --config Debug",
+      "options": { "cwd": "${workspaceFolder}/agent" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc", "$msCompile"],
+      "dependsOn": []
+    },
+    {
+      "label": "CMake: Run Tests",
+      "type": "shell",
+      "command": "ctest --output-on-failure -C Debug",
+      "options": { "cwd": "${workspaceFolder}/agent/build" },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Maven: Build Flink Job",
+      "type": "shell",
+      "command": "mvn clean package -DskipTests",
+      "options": { "cwd": "${workspaceFolder}/flink-job" },
+      "group": "build",
+      "problemMatcher": ["$javac"]
+    },
+    {
+      "label": "Maven: Run Flink Tests",
+      "type": "shell",
+      "command": "mvn test",
+      "options": { "cwd": "${workspaceFolder}/flink-job" },
+      "group": "test",
+      "problemMatcher": ["$javac"]
+    },
+    {
+      "label": "Docker: Start Stack",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": { "cwd": "${workspaceFolder}/infra" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Start Stack (scaled)",
+      "type": "shell",
+      "command": "docker compose up -d --scale flink-tm=4",
+      "options": { "cwd": "${workspaceFolder}/infra" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Stop Stack",
+      "type": "shell",
+      "command": "docker compose down",
+      "options": { "cwd": "${workspaceFolder}/infra" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: Stop Stack (remove volumes)",
+      "type": "shell",
+      "command": "docker compose down -v",
+      "options": { "cwd": "${workspaceFolder}/infra" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: View Logs",
+      "type": "shell",
+      "command": "docker compose logs -f --tail=50",
+      "options": { "cwd": "${workspaceFolder}/infra" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "K8s: Apply All Manifests",
+      "type": "shell",
+      "command": "kubectl apply -f k8s/ --recursive",
+      "problemMatcher": []
+    },
+    {
+      "label": "K8s: Port-Forward Grafana",
+      "type": "shell",
+      "command": "kubectl port-forward -n monitoring svc/monitoring-grafana 3000:80",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "K8s: Port-Forward Flink UI",
+      "type": "shell",
+      "command": "kubectl port-forward -n telemetry svc/flink-jobmanager 8081:8081",
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

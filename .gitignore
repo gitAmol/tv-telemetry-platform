@@ -1,0 +1,101 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+
+# Compiled binaries
+*.exe
+*.out
+*.app
+*.so
+*.dylib
+*.dll
+
+# Object files
+*.o
+*.obj
+*.lo
+*.slo
+
+# Generated files
+*.cmake
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+Makefile
+compile_commands.json
+*.cbp
+
+# IDEs
+# .vscode/ is tracked — it contains project-specific build/debug/task configs
+.vscode/*.log
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs and databases
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Dependencies
+third_party/
+external/
+vcpkg_installed/
+
+# Test output
+Testing/
+test_output/
+coverage/
+
+# Package managers
+conan/
+_deps/
+
+# Visual Studio
+.vs/
+out/
+*.user
+*.suo
+*.filters
+*.vcxproj.user
+
+# Java / Maven
+target/
+*.class
+*.jar
+!flink-job/lib/*.jar
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Docker
+.docker/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+
+# Archives
+*.tar.gz
+*.zip
+*.7z
+
+# Documentation
+docs/html/
+docs/latex/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

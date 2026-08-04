@@ -1,0 +1,176 @@
+version: '3.8'
+
+# ============================================================
+# TV Bluetooth Telemetry - Full Stack
+#
+# Services:
+#   kafka          - event bus (200 partitions for 20M TVs)
+#   flink-jm       - Flink JobManager
+#   flink-tm       - Flink TaskManager (scale with --scale flink-tm=N)
+#   timescaledb    - time-series storage
+#   grafana        - dashboards
+#   tv-agent       - simulated TV agent (remove in production)
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # Kafka (KRaft mode - no Zookeeper needed)
+  # ----------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:29092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [telemetry]
+
+  # Create topics with correct partition count for scale
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: >
+      bash -c "
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists
+          --topic bt-events --partitions 200 --replication-factor 1 &&
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists
+          --topic bt-alerts --partitions 10  --replication-factor 1 &&
+        echo 'Topics created'
+      "
+    networks: [telemetry]
+
+  # ----------------------------------------------------------
+  # TimescaleDB
+  # ----------------------------------------------------------
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB:       telemetry
+      POSTGRES_USER:     telemetry
+      POSTGRES_PASSWORD: telemetry
+    volumes:
+      - tsdb-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry -d telemetry"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [telemetry]
+
+  # ----------------------------------------------------------
+  # Flink JobManager
+  # ----------------------------------------------------------
+  flink-jm:
+    image: flink:1.18.0-scala_2.12-java11
+    container_name: flink-jm
+    ports:
+      - "8081:8081"   # Flink Web UI
+    command: jobmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jm
+        state.backend: filesystem
+        state.checkpoints.dir: file:///tmp/checkpoints
+        execution.checkpointing.interval: 60000
+        parallelism.default: 4
+    volumes:
+      - flink-checkpoints:/tmp/checkpoints
+      - ../flink-job/target:/opt/flink/jobs:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/overview"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [telemetry]
+
+  # Scale with: docker-compose up --scale flink-tm=4
+  flink-tm:
+    image: flink:1.18.0-scala_2.12-java11
+    depends_on:
+      flink-jm:
+        condition: service_healthy
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jm
+        taskmanager.numberOfTaskSlots: 4
+        state.backend: filesystem
+        state.checkpoints.dir: file:///tmp/checkpoints
+    volumes:
+      - flink-checkpoints:/tmp/checkpoints
+    networks: [telemetry]
+
+  # ----------------------------------------------------------
+  # Grafana
+  # ----------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.3.1
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    networks: [telemetry]
+
+  # ----------------------------------------------------------
+  # Simulated TV agent (remove in production; use real binary)
+  # ----------------------------------------------------------
+  tv-agent:
+    build:
+      context: ..
+      dockerfile: agent/Dockerfile.agent
+    container_name: tv-agent
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      TV_ID:    TV-SIM-001
+      BROKERS:  kafka:29092
+      DB_PATH:  /data/buffer.db
+    volumes:
+      - agent-data:/data
+    networks: [telemetry]
+    restart: unless-stopped
+
+volumes:
+  kafka-data:
+  tsdb-data:
+  flink-checkpoints:
+  grafana-data:
+  agent-data:
+
+networks:
+  telemetry:
+    driver: bridge

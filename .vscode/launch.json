@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug C++ Agent",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/agent/build/Debug/tv-bt-agent.exe",
+      "args": ["TV-00001", "localhost:9092", "./test-buffer.db"],
+      "cwd": "${workspaceFolder}/agent/build",
+      "stopAtEntry": false,
+      "environment": [],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug C++ Tests",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/agent/build/Debug/agent_tests.exe",
+      "cwd": "${workspaceFolder}/agent/build",
+      "stopAtEntry": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python Load Test (Local)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/load-test/simulator.py",
+      "cwd": "${workspaceFolder}/load-test",
+      "env": {
+        "KAFKA_BROKERS": "localhost:9092",
+        "TVS_PER_POD": "1000",
+        "TARGET_EPS": "100",
+        "DURATION_SECS": "60"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}
